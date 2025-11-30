@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>CSV Редактор ({{ value_col }})</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background-color: #f2f2f2; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+
+    <h2>Редактор данных: {{ value_col }}</h2>
+    <p>Текущее содержимое файла **{{ value_col }}** (изменяется по **{{ id_col }}**):</p>
+
+    <table id="data-table">
+        <thead>
+            <tr>
+                <th>{{ id_col }}</th>
+                <th>ФИО</th>
+                <th>{{ value_col }}</th>
+                <th>Действие</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in data %}
+            <tr data-id="{{ item[id_col] }}">
+                <td>{{ item[id_col] }}</td>
+                <td>{{ item['ФИО'] }}</td>
+                <td class="current-value">{{ item[value_col] }}</td>
+                <td>
+                    <input type="number"
+                           id="new-value-{{ item[id_col] }}"
+                           placeholder="Новое значение"
+                           value="{{ item[value_col] }}">
+                    <button onclick="updateRecord('{{ item[id_col] }}')">Изменить</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <p id="status-message"></p>
+
+    <script>
+        function updateRecord(recordId) {
+            const newValueInput = document.getElementById(`new-value-${recordId}`);
+            const newValue = newValueInput.value;
+            const statusMessage = document.getElementById('status-message');
+
+            statusMessage.className = '';
+            statusMessage.textContent = 'Отправка обновления...';
+
+            if (newValue === "" || isNaN(newValue)) {
+                statusMessage.className = 'error';
+                statusMessage.textContent = 'Пожалуйста, введите корректное числовое значение.';
+                return;
+            }
+
+            // Отправляем данные на наш Flask-сервер
+            fetch('/update', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    id: recordId,
+                    value: newValue // Отправляем как число
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusMessage.className = 'success';
+                    statusMessage.textContent = 'Успех: ' + data.message;
+
+                    // Обновляем отображение
+                    const row = document.querySelector(`tr[data-id="${recordId}"]`);
+                    if (row) {
+                        row.querySelector('.current-value').textContent = newValue;
+                    }
+                } else {
+                    statusMessage.className = 'error';
+                    statusMessage.textContent = 'Ошибка: ' + data.message;
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка сети:', error);
+                statusMessage.className = 'error';
+                statusMessage.textContent = 'Ошибка сети при обращении к серверу.';
+            });
+        }
+    </script>
+
+</body>
+</html>
